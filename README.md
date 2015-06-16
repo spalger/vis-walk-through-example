@@ -1,4 +1,4 @@
-# wiki-example-app
+# vis-walk-through-example
 
 From the [vis walkthrough](https://github.com/spalger/kibana/wiki) on spencer's unofficial kibana-wiki.
 

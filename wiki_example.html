@@ -1,0 +1,6 @@
+<div class="wiki-example-app" ng-controller="WikiExampleController as cntrl">
+  <div ng-if="cntrl.error" class="alert alert-danger">
+    <p>{{cntrl.error}}</p>
+  </div>
+  <visualize ng-if="cntrl.resp" vis="cntrl.vis" es-resp="cntrl.resp"></visualize>
+</div>

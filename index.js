@@ -1,20 +1,20 @@
 define(function (require) {
 
-  require('css!plugins/wiki_example/wiki_example.css');
+  require('css!plugins/vis-walk-through-example/vis-walk-through-example.css');
   require('components/timefilter/timefilter');
 
   var apps = require('registry/apps');
   apps.register(function VisualizeAppModule() {
     return {
-      id: 'wiki-example',
-      name: 'Wiki Exaxmple',
+      id: 'vis-walk-through-example',
+      name: 'Vis Walk-Through Example',
       order: 10
     };
   });
 
   require('routes')
-  .when('/wiki-example/:indexPattern?', {
-    template: require('text!plugins/wiki_example/wiki_example.html'),
+  .when('/vis-walk-through-example/:indexPattern?', {
+    template: require('text!plugins/vis-walk-through-example/vis-walk-through-example.html'),
     resolve: {
       indexPattern: function (indexPatterns, $route) {
         return indexPatterns.get($route.current.params.indexPattern || 'logstash-*')
@@ -31,19 +31,16 @@ define(function (require) {
 
   require('modules')
   .get('kibana')
-  .controller('WikiExampleController', function (Private, $scope, es, $route, timefilter) {
+  .controller('WikiExampleController', function (Private, $scope, courier, $route, timefilter) {
     var self = this;
 
-    var Vis = Private(require('components/vis/Vis'));
-    var visTypes = Private(require('registry/vis_types'));
-
-    timefilter.enabled = true;
-    $scope.$listen(timefilter, 'fetch', function () {
-      self.fetch();
-    });
-
-    self.visType = visTypes.byName.line;
+    // read the indexPattern from the route
     self.indexPattern = $route.current.locals.indexPattern;
+
+    // build our vis
+    var visTypes = Private(require('registry/vis_types'));
+    var Vis = Private(require('components/vis/Vis'));
+    self.visType = visTypes.byName.line;
     self.vis = new Vis(self.indexPattern, {
       type: self.visType,
       aggs:  [
@@ -64,37 +61,41 @@ define(function (require) {
       ]
     });
 
-    self.fetch = function () {
-      es.msearch({
-        pretty: true,
-        body: [
-          { index: self.indexPattern.id },
-          {
-            size: 0,
-            query: {
-              filtered: {
-                filter: {
-                  range: {
-                    '@timestamp': {
-                      gte: timefilter.time.from,
-                      lte: timefilter.time.to
-                    }
-                  }
-                }
-              }
-            },
-            aggs: self.vis.aggs.toDsl()
-          }
-        ]
-      })
-      .then(function (responses) {
-        var resp = responses.responses[0];
-        self.error = resp.error;
-        self.resp = !resp.error && resp;
-      });
-    };
+    // build our searchSource
+    self.searchSource = new courier.SearchSource()
+    .set('index', self.indexPattern)
+    .set('size', 0)
+    .set('aggs', function () {
+      // rather than pass in the dsl when creating the
+      // searchSource, we pass a function that will be called
+      // per request to create the dsl. This way, we can change things
+      // based on the environment in which we a exectuing the query
+      return self.vis.aggs.toDsl();
+    });
 
-    self.fetch();
+    // handle when the searchsource gets a response, set it on the controller
+    self.searchSource
+    .onResults(function (resp) {
+      self.error = null;
+      self.resp = resp;
+    });
+
+    // also handle request failures
+    self.searchSource.onError(function (err) {
+      self.error = err.message;
+      self.resp = null;
+    });
+
+    // enable the time filter
+    timefilter.enabled = true;
+
+    // tell the searchsource to update when the timefilter changes
+    $scope.$listen(timefilter, 'fetch', function () {
+      searchSource.fetch();
+    });
+
+    // alert kibana that our "application" has finished loading
+    $scope.$emit('application.load');
   });
 
 });

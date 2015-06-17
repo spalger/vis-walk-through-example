@@ -1,9 +1,9 @@
-.wiki-example-app {
+.vis-walk-through-example-app {
   display: flex;
   flex: 1 1 100%;
   flex-direction: column;
 }
 
-.wiki-example-app > visualize {
+.vis-walk-through-example-app > visualize {
   flex: 1 1 100%;
 }
